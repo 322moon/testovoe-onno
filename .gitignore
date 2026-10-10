@@ -1,0 +1,38 @@
+# Gradle
+.gradle/
+build/
+
+# IDE
+.idea/
+*.iml
+.classpath
+.project
+.settings/
+.vscode/
+
+# Local data and environment
+data/
+.env
+.env.*
+!.env.example
+*.log
+.DS_Store
+
+# IDE build output and project files
+out/
+*.ipr
+*.iws
+
+# Compiled classes and JVM dumps
+*.class
+*.hprof
+
+# H2 files outside data/
+*.mv.db
+*.trace.db
+*.lock.db
+
+# OS files
+._*
+Thumbs.db
+Desktop.ini

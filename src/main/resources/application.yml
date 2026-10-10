@@ -1,0 +1,32 @@
+spring:
+  application:
+    name: testovoe-onno
+  datasource:
+    url: jdbc:h2:file:./data/subscriptions
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+
+# Local development configuration.
+server:
+  address: 127.0.0.1
+  port: 8080
+
+onno:
+  ui:
+    locale: ru
+  auth:
+    users:
+      - username: admin
+        password: admin
+        roles: [ADMIN]
+    session:
+      remember-me:
+        allow-ephemeral-key: true
+
+# onno registers the recurring job; JobRunr must also run its workers.
+org:
+  jobrunr:
+    background-job-server:
+      enabled: true
+      worker-count: 2
