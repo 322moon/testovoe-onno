@@ -1,5 +1,7 @@
 package org.example.subscriptions.registers;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.example.subscriptions.catalogs.Client;
 import org.example.subscriptions.catalogs.Tariff;
 import su.onno.annotations.AccumulationRegister;
@@ -12,6 +14,8 @@ import su.onno.types.Ref;
 import java.math.BigDecimal;
 
 @AccumulationRegister(name = "TariffRevenue", title = "Выручка по тарифам", type = AccumulationType.TURNOVER)
+@Getter
+@Setter
 public class TariffRevenue extends AccumulationRecord {
     @Dimension(displayName = "Тариф")
     private Ref<Tariff> tariff;
@@ -24,36 +28,4 @@ public class TariffRevenue extends AccumulationRecord {
 
     @Resource(displayName = "Периодов", scale = 0)
     private BigDecimal periods;
-
-    public Ref<Tariff> getTariff() {
-        return tariff;
-    }
-
-    public void setTariff(Ref<Tariff> tariff) {
-        this.tariff = tariff;
-    }
-
-    public Ref<Client> getClient() {
-        return client;
-    }
-
-    public void setClient(Ref<Client> client) {
-        this.client = client;
-    }
-
-    public BigDecimal getAmount() {
-        return amount;
-    }
-
-    public void setAmount(BigDecimal amount) {
-        this.amount = amount;
-    }
-
-    public BigDecimal getPeriods() {
-        return periods;
-    }
-
-    public void setPeriods(BigDecimal periods) {
-        this.periods = periods;
-    }
 }

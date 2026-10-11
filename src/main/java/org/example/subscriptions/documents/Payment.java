@@ -1,5 +1,6 @@
 package org.example.subscriptions.documents;
 
+import lombok.Getter;
 import org.example.subscriptions.catalogs.Client;
 import org.example.subscriptions.enums.PaymentMethod;
 import org.example.subscriptions.registers.AccountBalance;
@@ -18,6 +19,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Document(name = "Payments", title = "Платежи", numberPrefix = "PAY-")
+@Getter
 public class Payment extends DocumentObject implements OnFillingHandler, Validated, Postable {
 
     @Attribute(displayName = "Клиент", required = true)
@@ -56,17 +58,5 @@ public class Payment extends DocumentObject implements OnFillingHandler, Validat
             movement.setClient(client);
             movement.setAmount(amount);
         });
-    }
-
-    public Ref<Client> getClient() {
-        return client;
-    }
-
-    public BigDecimal getAmount() {
-        return amount;
-    }
-
-    public PaymentMethod getMethod() {
-        return method;
     }
 }

@@ -1,5 +1,7 @@
 package org.example.subscriptions.catalogs;
 
+import lombok.Getter;
+
 import su.onno.annotations.Attribute;
 import su.onno.annotations.Catalog;
 import su.onno.lifecycle.OnFillingHandler;
@@ -11,6 +13,7 @@ import java.math.BigDecimal;
 import java.util.List;
 
 @Catalog(name = "Tariffs", title = "Тарифы", codePrefix = "TR-")
+@Getter
 public class Tariff extends CatalogObject implements OnFillingHandler, Validated {
 
     @Attribute(displayName = "Цена за период", required = true, min = 0)
@@ -40,17 +43,5 @@ public class Tariff extends CatalogObject implements OnFillingHandler, Validated
                         () -> periodDays != null && periodDays > 0),
                 BusinessRule.onField("available", "Укажите доступность тарифа", () -> available != null)
         );
-    }
-
-    public BigDecimal getPrice() {
-        return price;
-    }
-
-    public Integer getPeriodDays() {
-        return periodDays;
-    }
-
-    public Boolean getAvailable() {
-        return available;
     }
 }

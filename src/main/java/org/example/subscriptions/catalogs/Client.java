@@ -1,5 +1,6 @@
 package org.example.subscriptions.catalogs;
 
+import lombok.Getter;
 import org.example.subscriptions.enums.ClientStatus;
 import su.onno.annotations.Attribute;
 import su.onno.annotations.Catalog;
@@ -12,6 +13,7 @@ import java.time.LocalDate;
 import java.util.List;
 
 @Catalog(name = "Clients", title = "Клиенты", codePrefix = "CL-")
+@Getter
 public class Client extends CatalogObject implements OnFillingHandler, Validated {
 
     @Attribute(displayName = "Статус")
@@ -45,21 +47,5 @@ public class Client extends CatalogObject implements OnFillingHandler, Validated
                 BusinessRule.onField("registrationDate", "Укажите дату регистрации",
                         () -> registrationDate != null)
         );
-    }
-
-    public ClientStatus getStatus() {
-        return status;
-    }
-
-    public String getEmail() {
-        return email;
-    }
-
-    public String getPhone() {
-        return phone;
-    }
-
-    public LocalDate getRegistrationDate() {
-        return registrationDate;
     }
 }

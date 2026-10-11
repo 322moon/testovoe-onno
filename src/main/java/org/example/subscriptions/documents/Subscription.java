@@ -1,7 +1,8 @@
 package org.example.subscriptions.documents;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.example.subscriptions.catalogs.Client;
-import org.example.subscriptions.catalogs.Tariff;
 import org.example.subscriptions.enums.SubscriptionStatus;
 import org.example.subscriptions.registers.AccountBalance;
 import org.example.subscriptions.registers.TariffRevenue;
@@ -27,26 +28,40 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.UUID;
 
 @Document(name = "Subscriptions", title = "Подписки", numberPrefix = "SUB-")
 public class Subscription extends DocumentObject
         implements OnFillingHandler, BeforeWriteHandler, BeforePostHandler, Validated, Postable {
+    @Getter
+    @Setter
     @Attribute(displayName = "Клиент", required = true)
     private Ref<Client> client;
 
+    @Getter
+    @Setter
     @Attribute(displayName = "Статус")
     private SubscriptionStatus status;
 
+    @Getter
+    @Setter
     @Attribute(displayName = "Дата начала")
     private LocalDate startDate;
 
+    @Getter
+    @Setter
     @Attribute(displayName = "Дата окончания")
     private LocalDate endDate;
 
+    @Getter
+    @Setter
     @Attribute(displayName = "Итого")
     private BigDecimal total;
 
+    @Getter
+    @Attribute(displayName = "Причина отмены", length = 1000)
+    private String cancellationReason;
+
+    @Getter
     @TabularSection
     private List<SubscriptionLine> lines = new ArrayList<>();
 
@@ -54,13 +69,16 @@ public class Subscription extends DocumentObject
     private boolean tariffsAvailable;
 
     @Transient
-    private PurchaseState persistedPurchase;
+    private SubscriptionSnapshot persistedPurchase;
 
     @Transient
     private SubscriptionStatus persistedStatus;
 
     @Transient
     private LocalDate statusRefreshDate;
+
+    @Transient
+    private boolean cancellationRequested;
 
     @Override
     public void onFilling() {
@@ -77,9 +95,9 @@ public class Subscription extends DocumentObject
 
     @Override
     public void beforeWrite() {
-        if (statusRefreshDate != null) {
-            if (!isStatusOnlyUpdate()) {
-                throw new ValidationException("При обновлении статуса нельзя изменять данные покупки");
+        if (statusRefreshDate != null || cancellationRequested) {
+            if (!isStateOnlyUpdate()) {
+                throw new ValidationException("При изменении состояния нельзя изменять данные покупки");
             }
             return;
         }
@@ -140,7 +158,7 @@ public class Subscription extends DocumentObject
         if (status == next) {
             return false;
         }
-        if (persistedPurchase == null || !persistedPurchase.equals(purchaseState())) {
+        if (persistedPurchase == null || !persistedPurchase.matches(this)) {
             throw new ValidationException("Перед обновлением статуса загрузите неизменённую подписку из репозитория");
         }
         statusRefreshDate = today;
@@ -161,38 +179,50 @@ public class Subscription extends DocumentObject
 
     // Repository callbacks remember what was read/saved. Generic HTTP updates cannot enable this path.
     void rememberPersistedState() {
-        persistedPurchase = purchaseState();
+        persistedPurchase = SubscriptionSnapshot.capture(this);
         persistedStatus = status;
         statusRefreshDate = null;
+        cancellationRequested = false;
+    }
+
+    public void cancel(String reason) {
+        if (isPosted() || isDeletionMark() || status == SubscriptionStatus.CANCELLED
+                || persistedPurchase == null || !persistedPurchase.matches(this)) {
+            throw new ValidationException("Для отмены загрузите подписку и снимите её проведение");
+        }
+        String normalized = reason == null ? "" : reason.strip();
+        if (normalized.isEmpty() || normalized.length() > 1000) {
+            throw new ValidationException("Укажите причину отмены: от 1 до 1000 символов");
+        }
+        cancellationReason = normalized;
+        status = SubscriptionStatus.CANCELLED;
+        cancellationRequested = true;
+    }
+
+    private boolean isStateOnlyUpdate() {
+        return isStatusOnlyUpdate() || isCancellationUpdate();
+    }
+
+    private boolean isCancellationUpdate() {
+        return cancellationRequested && persistedPurchase != null
+                && persistedStatus != SubscriptionStatus.CANCELLED
+                && !isPosted() && !isDeletionMark() && status == SubscriptionStatus.CANCELLED
+                && persistedPurchase.matchesIgnoringCancellationReason(this)
+                && cancellationReason != null && !cancellationReason.isBlank() && cancellationReason.length() <= 1000;
     }
 
     private boolean isStatusOnlyUpdate() {
         return statusRefreshDate != null && persistedPurchase != null
                 && persistedStatus != SubscriptionStatus.CANCELLED && status != SubscriptionStatus.CANCELLED
                 && !isDeletionMark() && startDate != null && endDate != null
-                && persistedPurchase.equals(purchaseState())
+                && persistedPurchase.matches(this)
                 && status == statusOn(statusRefreshDate, isPosted());
-    }
-
-    private PurchaseState purchaseState() {
-        List<LineState> items = lines == null ? null : lines.stream().map(line -> line == null ? null
-                : new LineState(line.getId(), line.getTariff(), line.getPeriods(), line.getPrice(), line.getAmount())).toList();
-        return new PurchaseState(getId(), getNumber(), getDate(), isPosted(), isDeletionMark(),
-                client, startDate, endDate, total, items);
-    }
-
-    private record PurchaseState(UUID id, String number, LocalDateTime date, boolean posted, boolean deleted,
-                                 Ref<Client> client, LocalDate start, LocalDate end, BigDecimal total,
-                                 List<LineState> lines) {
-    }
-
-    private record LineState(UUID id, Ref<Tariff> tariff, Integer periods, BigDecimal price, BigDecimal amount) {
     }
 
     @Override
     public List<BusinessRule> rules() {
         return List.of(
-                new BusinessRule("subscription-unposted", "Сначала снимите проведение подписки", () -> !isPosted() || isStatusOnlyUpdate()),
+                new BusinessRule("subscription-unposted", "Сначала снимите проведение подписки", () -> !isPosted() || isStateOnlyUpdate()),
                 BusinessRule.onField("client", "Выберите клиента", () -> client != null),
                 BusinessRule.onField("status", "Выберите статус", () -> status != null),
                 BusinessRule.onField("startDate", "Укажите дату начала", () -> startDate != null),
@@ -202,7 +232,7 @@ public class Subscription extends DocumentObject
                         () -> lines != null && lines.stream().allMatch(line -> line != null
                                 && line.getPeriods() != null && line.getPeriods() > 0)),
                 new BusinessRule("tariffs-available", "Все тарифы должны существовать и быть доступны для подключения",
-                        () -> isStatusOnlyUpdate() || tariffsAvailable),
+                        () -> isStateOnlyUpdate() || tariffsAvailable),
                 new BusinessRule("duration-valid", "Срок подписки выходит за допустимый диапазон дат",
                         () -> endDate != null),
                 new BusinessRule("total-valid", "Сумма подписки слишком велика",
@@ -227,49 +257,5 @@ public class Subscription extends DocumentObject
                 movement.setPeriods(BigDecimal.valueOf(line.getPeriods()));
             });
         }
-    }
-
-    public Ref<Client> getClient() {
-        return client;
-    }
-
-    public void setClient(Ref<Client> client) {
-        this.client = client;
-    }
-
-    public SubscriptionStatus getStatus() {
-        return status;
-    }
-
-    public void setStatus(SubscriptionStatus status) {
-        this.status = status;
-    }
-
-    public LocalDate getStartDate() {
-        return startDate;
-    }
-
-    public void setStartDate(LocalDate startDate) {
-        this.startDate = startDate;
-    }
-
-    public LocalDate getEndDate() {
-        return endDate;
-    }
-
-    public void setEndDate(LocalDate endDate) {
-        this.endDate = endDate;
-    }
-
-    public BigDecimal getTotal() {
-        return total;
-    }
-
-    public void setTotal(BigDecimal total) {
-        this.total = total;
-    }
-
-    public List<SubscriptionLine> getLines() {
-        return lines;
     }
 }

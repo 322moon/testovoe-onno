@@ -20,6 +20,8 @@ repositories {
 }
 
 dependencies {
+    compileOnly 'org.projectlombok:lombok:1.18.48'
+    annotationProcessor 'org.projectlombok:lombok:1.18.48'
     implementation 'org.springframework.boot:spring-boot-starter-data-jdbc'
     implementation "su.onno:onno-framework-starter:${onnoVersion}"
     implementation "su.onno:onno-ui-starter:${onnoVersion}"
