@@ -1,5 +1,7 @@
 package org.example.subscriptions.registers;
 
+import lombok.Getter;
+import lombok.Setter;
 import org.example.subscriptions.catalogs.Client;
 import su.onno.annotations.AccumulationRegister;
 import su.onno.annotations.Dimension;
@@ -12,6 +14,8 @@ import java.math.BigDecimal;
 
 @AccumulationRegister(name = "AccountBalance", title = "Остатки лицевых счетов",
         type = AccumulationType.BALANCE, allowNegative = false)
+@Getter
+@Setter
 public class AccountBalance extends AccumulationRecord {
 
     @Dimension(displayName = "Клиент")
@@ -19,20 +23,4 @@ public class AccountBalance extends AccumulationRecord {
 
     @Resource(displayName = "Остаток")
     private BigDecimal amount;
-
-    public Ref<Client> getClient() {
-        return client;
-    }
-
-    public void setClient(Ref<Client> client) {
-        this.client = client;
-    }
-
-    public BigDecimal getAmount() {
-        return amount;
-    }
-
-    public void setAmount(BigDecimal amount) {
-        this.amount = amount;
-    }
 }

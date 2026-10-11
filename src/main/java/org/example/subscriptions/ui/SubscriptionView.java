@@ -1,14 +1,50 @@
 package org.example.subscriptions.ui;
 
+import lombok.RequiredArgsConstructor;
 import org.example.subscriptions.documents.Subscription;
 import org.example.subscriptions.documents.SubscriptionLine;
+import org.example.subscriptions.enums.SubscriptionStatus;
+import org.example.subscriptions.services.SubscriptionCancellationService;
 import org.springframework.stereotype.Component;
+import su.onno.ui.ActionRejectedException;
+import su.onno.ui.ActionResult;
+import su.onno.ui.ActionScope;
+import su.onno.ui.ActionSpec;
+import su.onno.ui.ActionToast;
 import su.onno.ui.EntityConfigBuilder;
 import su.onno.ui.EntityView;
+import su.onno.ui.InputType;
 import su.onno.ui.ListSpec;
+import su.onno.validation.ValidationException;
 
 @Component
+@RequiredArgsConstructor
 public class SubscriptionView implements EntityView<Subscription> {
+    private final SubscriptionCancellationService cancellation;
+
+    @Override
+    public void actions(ActionSpec actions) {
+        cancelAction(actions, "cancel", ActionScope.ROW);
+        cancelAction(actions, "cancelSubscription", ActionScope.DETAIL);
+    }
+
+    private void cancelAction(ActionSpec actions, String key, ActionScope scope) {
+        actions.action(key).label("Отменить подписку").icon("ban").scope(scope)
+                .visibleWhen(row -> row.enumValue(Subscription::getStatus, SubscriptionStatus.class) != SubscriptionStatus.CANCELLED)
+                .enabledWhen(row -> row.enumValue(Subscription::getStatus, SubscriptionStatus.class) != SubscriptionStatus.CANCELLED)
+                .form(form -> form.input("reason").label("Причина отмены").type(InputType.TEXTAREA)
+                        .placeholder("Почему отменяется подписка?").required())
+                .handler(context -> {
+                    try {
+                        cancellation.cancel(context.id(), context.input("reason"));
+                        return ActionResult.refresh(ActionToast.success("Подписка отменена"));
+                    } catch (ValidationException exception) {
+                        throw ActionRejectedException.builder().message(exception.getMessage())
+                                .formError(exception.getMessage()).build();
+                    }
+                });
+    }
+
     @Override
     public Class<Subscription> entity() {
         return Subscription.class;
@@ -30,9 +66,10 @@ public class SubscriptionView implements EntityView<Subscription> {
     @Override
     public void fields(EntityConfigBuilder<Subscription> fields) {
         fields.action("unpost").primary();
+        fields.action("cancelSubscription").primary();
         fields.field(Subscription::getClient).order(0).width("full").hint("Владелец лицевого счёта")
                 .field(Subscription::getStatus).order(1).width("half")
-                .hint("Для отмены сначала снимите проведение, затем выберите «Отменена»")
+                .hint("Для отмены с причиной нажмите «Отменить подписку»")
                 .field(Subscription::getStartDate).order(2).width("half").format("dd.MM.yyyy")
                 .hint("Первый день действия подписки")
                 .field(Subscription::getEndDate).order(3).width("half").format("dd.MM.yyyy")
@@ -40,6 +77,7 @@ public class SubscriptionView implements EntityView<Subscription> {
                 .field(Subscription::getTotal).order(4).width("half").format("currency:RUB")
                 .hint("Рассчитывается при сохранении; списывается при проведении")
                 .field(Subscription::getDate).order(5).width("half").label("Дата документа").format("dd.MM.yyyy HH:mm")
+                .field(Subscription::getCancellationReason).order(6).width("full").widget("textarea")
                 .field(Subscription::getNumber).label("Номер").hideInForm()
                 .field(Subscription::isPosted).label("Проведена").hideInForm();
         fields.rowRefField(Subscription::getLines, SubscriptionLine::getTariff).order(0).hint("Доступный для подключения тариф");
